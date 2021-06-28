@@ -25,6 +25,8 @@ from plone import api as ploneapi
 from plone.protect.utils import addTokenToUrl
 from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
 from zope.component import getAdapters
+from Products.CMFCore.utils import getToolByName
+from Products.PluggableAuthService.interfaces.plugins import IChallengePlugin
 
 
 class FrontPageView(BrowserView):
@@ -43,13 +45,22 @@ class FrontPageView(BrowserView):
         # to the custom landing page, which is set in setup. If no landing
         # page setup, then redirect to login page.
         if self.is_anonymous_user():
-            # Redirect to the selected Landing Page
+            # Redirect to the selected Landing Page(
             if landingpage:
                 return self.request.response.redirect(
                     landingpage.absolute_url())
-            # Redirect to login page
-            return self.request.response.redirect(login_url)
+            # Use first available challenge plugin
+            pas = getToolByName(self.portal, "acl_users") 
+            plugin_id = next(iter(pas.plugins.listPluginIds(IChallengePlugin)), None)
+            if(plugin_id):
+                plugin = pas[plugin_id]
+                plugin.challenge(self.request, self.request.response)
+            else:
+                # Redirect to login page
+                return self.request.response.redirect(login_url)
 
+            
+            
         # Authenticated Users get either the Dashboard, the std. login page
         # or the custom landing page. Furthermore, they can switch between the
         # Dashboard and the landing page.
